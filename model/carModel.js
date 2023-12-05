@@ -11,6 +11,9 @@ const manufacturerSchema = mongoose.Schema(
     manufacturerAddr: {
       type: String,
     },
+    description: {
+      type: String,
+    },
   },
   {
     timestamps: true,

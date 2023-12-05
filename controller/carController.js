@@ -1,4 +1,5 @@
 const CarDb = require("../model/carModel");
+const mongoose = require("mongoose");
 
 // create manufacturer
 const createManufacturer = async (req, res) => {
@@ -209,9 +210,9 @@ const getManufacturerVehicle = async (req, res) => {
     return `${month}/${day}/${year}`;
   };
   try {
-    const manufacturerVehicle = await CarDb.ManufacturerVehicle.find().populate(
-      ["manufacturer", "model", "dealer"]
-    );
+    const manufacturerVehicle = await CarDb.ManufacturerVehicle.find()
+      .populate(["manufacturer", "dealer"])
+      .populate({ path: "model", populate: "brand" });
 
     // Format createdAt and updatedAt fields to day, month, year format
     const formattedManufacturerVehicle = manufacturerVehicle.map((vehicle) => ({
@@ -271,8 +272,8 @@ const getDealerVehiclesByModel = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10; // Number of items per page
 
     // Query the total count of models for the provided brandId
-    const totalModelsCount = await CarDb.Model.countDocuments({
-      model: modelId,
+    const totalModelsCount = await CarDb.DealerVehicle.countDocuments({
+      vehicleModel: modelId,
     });
 
     const skip = (page - 1) * limit; // Calculate the offset
@@ -308,14 +309,14 @@ const getDealerVehiclesByDealerId = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10; // Number of items per page
 
     // Query the total count of models for the provided brandId
-    const totalModelsCount = await CarDb.Model.countDocuments({
-      model: modelId,
+    const totalModelsCount = await CarDb.DealerVehicle.countDocuments({
+      dealer: dealerId,
     });
 
     const skip = (page - 1) * limit; // Calculate the offset
 
     // Query models based on the provided brandId with pagination
-    const models = await CarDb.DealerVehicle.find({ "dealer._id": dealerId })
+    const models = await CarDb.DealerVehicle.find({ dealer: dealerId })
       .populate({
         path: "vehicleModel",
         populate: { path: "brand" },
@@ -338,8 +339,9 @@ const getDealerVehiclesByDealerId = async (req, res) => {
 };
 
 // fetch sales
-const getSalesLastThreeYears = async (req, res) => {
+const getSalesByDealers = async (req, res) => {
   try {
+    const dealerId = req.params.dealerId;
     const currentDate = new Date();
     const threeYearsAgo = new Date(
       currentDate.getFullYear() - 2,
@@ -347,12 +349,12 @@ const getSalesLastThreeYears = async (req, res) => {
       currentDate.getDate()
     );
     const sales = await CarDb.Sale.aggregate([
-      {
-        $match: {
-          vehiclePrice: { $gt: 550000 },
-          createdAt: { $lte: threeYearsAgo },
-        },
-      },
+      // {
+      //   $match: {
+      //     vehiclePrice: { $gt: 550000 },
+      //     createdAt: { $lte: threeYearsAgo },
+      //   },
+      // },
       {
         $lookup: {
           from: "dealervehicles", // Update this with your collection name
@@ -363,6 +365,11 @@ const getSalesLastThreeYears = async (req, res) => {
       },
       {
         $unwind: "$dealerVehicle", // In case it's an array after lookup
+      },
+      {
+        $match: {
+          "dealerVehicle.dealer": new mongoose.Types.ObjectId(dealerId),
+        },
       },
       {
         $lookup: {
@@ -408,9 +415,11 @@ const getSalesLastThreeYears = async (req, res) => {
       {
         $unwind: "$customer", // In case it's an array after lookup
       },
-      {
-        $match: { "customer.customerGender": "Female" },
-      },
+      // {
+      //   $match: {
+      //     "customer._id": new mongoose.Types.ObjectId("656dbe6de3c7355512567d35"),
+      //   },
+      // },
       {
         $addFields: {
           formattedCreatedAt: {
@@ -436,6 +445,7 @@ const getSalesLastThreeYears = async (req, res) => {
           updatedAt: "$formattedUpdatedAt",
         },
       },
+
       {
         $project: {
           formattedCreatedAt: 0, // Remove intermediate fields
@@ -723,7 +733,28 @@ const getTopBrandsBySalesTotalAmount = async (req, res) => {
   }
 };
 
+// update code
+
+const updateManufacturer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const manufacturer = await CarDb.Manufacturer.findByIdAndUpdate(
+      id,
+      req.body,
+      { new: true }
+    );
+    if (!manufacturer) {
+      res.status(401).json({ message: `no manufacturer with id:${id} found` });
+    } else {
+      res.status(200).json(manufacturer);
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
+  //create
   createManufacturer,
   createBrand,
   createOption,
@@ -733,6 +764,7 @@ module.exports = {
   createDealerVehicle,
   createCustomer,
   createSale,
+  // fetch
   getBrand,
   getModel,
   getManufacturerVehicle,
@@ -740,11 +772,13 @@ module.exports = {
   getCustomer,
   getDealerVehicle,
   getSales,
-  getSalesLastThreeYears,
   getTopBrandsBySales,
   getTopBrandsBySalesTotalAmount,
   // newaddedurl
   getModelByBrand,
   getDealerVehiclesByModel,
   getDealerVehiclesByDealerId,
+  getSalesByDealers,
+  // update
+  updateManufacturer,
 };

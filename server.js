@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
@@ -8,7 +9,8 @@ const auth = require("./middlewares/auth");
 
 var cors = require("cors");
 const app = express();
-const port = 8000;
+const MONGO_URL = process.env.MONGO_URL;
+const port = process.env.PORT;
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -32,9 +34,7 @@ app.get("/auth-endpoint", auth, (request, response) => {
 });
 
 mongoose
-  .connect(
-    "mongodb+srv://admin:qwertyuiop@richjohnapi.sklrzus.mongodb.net/ite-19?retryWrites=true&w=majority"
-  )
+  .connect(MONGO_URL)
   .then(() => {
     console.log("connected");
     app.listen(port, () => {

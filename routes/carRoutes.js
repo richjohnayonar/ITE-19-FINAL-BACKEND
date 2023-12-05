@@ -24,16 +24,19 @@ router.get("/dealer", CarController.getDealer);
 router.get("/customer", CarController.getCustomer);
 router.get("/dealerVehicle/:modelId", CarController.getDealerVehiclesByModel);
 router.get(
-  "/dealerVehicle/:dealerId",
+  "/dealerVehicles/:dealerId",
   CarController.getDealerVehiclesByDealerId
 );
 router.get("/dealerVehicle", CarController.getDealerVehicle);
 router.get("/sales", CarController.getSales);
-router.get("/salesLastThreeYears", CarController.getSalesLastThreeYears);
+router.get("/salesByDealer/:dealerId", CarController.getSalesByDealers);
 router.get("/topBrandsBySales", CarController.getTopBrandsBySales);
 router.get(
   "/topBrandsBySalesTotalAmount",
   CarController.getTopBrandsBySalesTotalAmount
 );
+
+// update routes
+router.put("/update-manufacturer/:id", CarController.updateManufacturer);
 
 module.exports = router;
