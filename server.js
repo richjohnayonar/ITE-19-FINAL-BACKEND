@@ -10,7 +10,7 @@ const auth = require("./middlewares/auth");
 var cors = require("cors");
 const app = express();
 const MONGO_URL = process.env.MONGO_URL;
-const port = process.env.PORT;
+const port = process.env.PORT || 8100;
 
 app.use(cors());
 app.use(bodyParser.json());
