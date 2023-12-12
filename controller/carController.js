@@ -520,6 +520,38 @@ const getSales = async (req, res) => {
       {
         $unwind: "$customer", // In case it's an array after lookup
       },
+      {
+        $addFields: {
+          formattedCreatedAt: {
+            $dateToString: {
+              date: "$createdAt",
+              format: "%m/%d/%Y", // Month Day, Year format
+            },
+          },
+          formattedUpdatedAt: {
+            $dateToString: {
+              date: "$updatedAt",
+              format: "%m/%d/%Y", // Month Day, Year format
+            },
+          },
+        },
+      },
+      {
+        $unset: ["createdAt", "updatedAt"], // Remove original fields
+      },
+      {
+        $addFields: {
+          createdAt: "$formattedCreatedAt", // Reassign formatted fields
+          updatedAt: "$formattedUpdatedAt",
+        },
+      },
+
+      {
+        $project: {
+          formattedCreatedAt: 0, // Remove intermediate fields
+          formattedUpdatedAt: 0,
+        },
+      },
     ]);
     console.log(sales);
     res.status(200).json(sales);

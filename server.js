@@ -6,8 +6,8 @@ const carRoutes = require("./routes/carRoutes");
 const userRoutes = require("./routes/userRoutes");
 const jwt = require("jsonwebtoken");
 const auth = require("./middlewares/auth");
-
 var cors = require("cors");
+
 const app = express();
 const MONGO_URL = process.env.MONGO_URL;
 const port = process.env.PORT || 8100;
@@ -25,7 +25,7 @@ app.use("/api", userRoutes);
 
 // free endpoint
 app.get("/free-endpoint", (request, response) => {
-  response.json({ message: "You are free to access me anytime" });
+  response.json({ message: "You are free to access mes anytime" });
 });
 
 // authentication endpoint
