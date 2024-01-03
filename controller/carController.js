@@ -211,7 +211,7 @@ const getManufacturerVehicle = async (req, res) => {
   };
   try {
     const manufacturerVehicle = await CarDb.ManufacturerVehicle.find()
-      .populate(["manufacturer", "dealer"])
+      .populate("manufacturer")
       .populate({ path: "model", populate: "brand" });
 
     // Format createdAt and updatedAt fields to day, month, year format
@@ -249,15 +249,104 @@ const getCustomer = async (req, res) => {
 // fetch dealer vehicle
 const getDealerVehicle = async (req, res) => {
   try {
-    const dealerVehicle = await CarDb.DealerVehicle.find()
-      .populate({
-        path: "vehicleModel",
-        populate: {
-          path: "brand",
-          model: "Brand",
+    const searchQuery = req.query.query; // Assuming the VIN is passed as a query parameter
+
+    const dealerVehicle = await CarDb.DealerVehicle.aggregate([
+      {
+        $lookup: {
+          from: "dealers",
+          localField: "dealer",
+          foreignField: "_id",
+          as: "dealerInfo",
         },
-      })
-      .populate("dealer");
+      },
+      {
+        $unwind: "$dealerInfo",
+      },
+      {
+        $lookup: {
+          from: "manufacturervehicles",
+          localField: "manufacturerVehicle",
+          foreignField: "_id",
+          as: "manufacturerVehicleInfo",
+        },
+      },
+      {
+        $unwind: "$manufacturerVehicleInfo",
+      },
+      {
+        $lookup: {
+          from: "manufacturers",
+          localField: "manufacturerVehicleInfo.manufacturer",
+          foreignField: "_id",
+          as: "manufacturerInfo",
+        },
+      },
+      {
+        $unwind: "$manufacturerInfo",
+      },
+      {
+        $lookup: {
+          from: "models",
+          localField: "manufacturerVehicleInfo.model",
+          foreignField: "_id",
+          as: "modelInfo",
+        },
+      },
+      {
+        $unwind: "$modelInfo",
+      },
+      {
+        $lookup: {
+          from: "brands",
+          localField: "modelInfo.brand",
+          foreignField: "_id",
+          as: "brandInfo",
+        },
+      },
+      {
+        $unwind: "$brandInfo",
+      },
+      {
+        $addFields: {
+          formattedCreatedAt: {
+            $dateToString: {
+              date: "$createdAt",
+              format: "%m/%d/%Y",
+            },
+          },
+          formattedUpdatedAt: {
+            $dateToString: {
+              date: "$updatedAt",
+              format: "%m/%d/%Y",
+            },
+          },
+        },
+      },
+      {
+        $unset: ["createdAt", "updatedAt"],
+      },
+      {
+        $addFields: {
+          createdAt: "$formattedCreatedAt",
+          updatedAt: "$formattedUpdatedAt",
+        },
+      },
+      {
+        $project: {
+          formattedCreatedAt: 0,
+          formattedUpdatedAt: 0,
+        },
+      },
+      {
+        $match: {
+          "manufacturerVehicleInfo.vin": {
+            $regex: new RegExp(searchQuery, "i"),
+          },
+        },
+      },
+    ]);
+
     res.status(200).json(dealerVehicle);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -265,73 +354,232 @@ const getDealerVehicle = async (req, res) => {
 };
 
 //by models
+// const getDealerVehiclesByModel = async (req, res) => {
+//   try {
+//     const modelId = req.params.modelId;
+//     const page = parseInt(req.query.page) || 1; // Current page number
+//     const limit = parseInt(req.query.limit) || 10; // Number of items per page
+
+//     // Query the total count of models for the provided brandId
+//     const totalModelsCount = await CarDb.DealerVehicle.countDocuments({
+//       vehicleModel: modelId,
+//     });
+
+//     const skip = (page - 1) * limit; // Calculate the offset
+
+//     // Query models based on the provided brandId with pagination
+//     const models = await CarDb.DealerVehicle.find({ vehicleModel: modelId })
+//       .populate({
+//         path: "vehicleModel",
+//         populate: { path: "brand" },
+//       })
+//       .populate("dealer")
+//       .limit(limit)
+//       .skip(skip);
+
+//     const totalPages = Math.ceil(totalModelsCount / limit); // Calculate total pages
+//     console.log(`totalPages: ${totalPages}`);
+
+//     res.json({
+//       models,
+//       currentPage: page,
+//       totalPages: totalPages, // Include total pages in the response
+//     });
+//   } catch (error) {
+//     res.status(500).json({ message: error.message });
+//   }
+// };
+
+//getDealerVehiclesByModelv2
 const getDealerVehiclesByModel = async (req, res) => {
+  const modelId = req.params.modelId;
+  const page = parseInt(req.query.page) || 1; // Current page number
+  const limit = parseInt(req.query.limit) || 10; // Number of items per page
+
   try {
-    const modelId = req.params.modelId;
-    const page = parseInt(req.query.page) || 1; // Current page number
-    const limit = parseInt(req.query.limit) || 10; // Number of items per page
+    const result = await CarDb.DealerVehicle.aggregate([
+      {
+        $lookup: {
+          from: "dealers",
+          localField: "dealer",
+          foreignField: "_id",
+          as: "dealerInfo",
+        },
+      },
+      {
+        $unwind: "$dealerInfo",
+      },
+      {
+        $lookup: {
+          from: "manufacturervehicles",
+          localField: "manufacturerVehicle",
+          foreignField: "_id",
+          as: "manufacturerVehicleInfo",
+        },
+      },
+      {
+        $unwind: "$manufacturerVehicleInfo",
+      },
+      {
+        $lookup: {
+          from: "models",
+          localField: "manufacturerVehicleInfo.model",
+          foreignField: "_id",
+          as: "modelInfo",
+        },
+      },
+      {
+        $unwind: "$modelInfo",
+      },
+      {
+        $lookup: {
+          from: "brands",
+          localField: "modelInfo.brand",
+          foreignField: "_id",
+          as: "brandInfo",
+        },
+      },
+      {
+        $unwind: "$brandInfo",
+      },
+      {
+        $match: {
+          "modelInfo._id": new mongoose.Types.ObjectId(modelId),
+        },
+      },
+      {
+        $facet: {
+          paginatedResults: [
+            {
+              $skip: (page - 1) * limit,
+            },
+            {
+              $limit: limit,
+            },
+          ],
+          totalCount: [
+            {
+              $count: "count",
+            },
+          ],
+        },
+      },
+    ]);
 
-    // Query the total count of models for the provided brandId
-    const totalModelsCount = await CarDb.DealerVehicle.countDocuments({
-      vehicleModel: modelId,
-    });
+    const dealerVehicles = result[0].paginatedResults;
 
-    const skip = (page - 1) * limit; // Calculate the offset
+    if (!dealerVehicles || dealerVehicles.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No dealer vehicles found for this model." });
+    }
 
-    // Query models based on the provided brandId with pagination
-    const models = await CarDb.DealerVehicle.find({ vehicleModel: modelId })
-      .populate({
-        path: "vehicleModel",
-        populate: { path: "brand" },
-      })
-      .populate("dealer")
-      .limit(limit)
-      .skip(skip);
-
-    const totalPages = Math.ceil(totalModelsCount / limit); // Calculate total pages
-    console.log(`totalPages: ${totalPages}`);
+    const totalModelsCount =
+      result[0].totalCount.length > 0 ? result[0].totalCount[0].count : 0;
+    const totalPages = Math.ceil(totalModelsCount / limit);
 
     res.json({
-      models,
+      dealerVehicles,
       currentPage: page,
-      totalPages: totalPages, // Include total pages in the response
+      totalPages: totalPages,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-//by id
+//by dealer id
 const getDealerVehiclesByDealerId = async (req, res) => {
+  const dealerId = req.params.dealerId;
+  const page = parseInt(req.query.page) || 1; // Current page number
+  const limit = parseInt(req.query.limit) || 10; // Number of items per page
+
   try {
-    const dealerId = req.params.dealerId;
-    const page = parseInt(req.query.page) || 1; // Current page number
-    const limit = parseInt(req.query.limit) || 10; // Number of items per page
+    const result = await CarDb.DealerVehicle.aggregate([
+      {
+        $lookup: {
+          from: "dealers",
+          localField: "dealer",
+          foreignField: "_id",
+          as: "dealerInfo",
+        },
+      },
+      {
+        $unwind: "$dealerInfo",
+      },
+      {
+        $lookup: {
+          from: "manufacturervehicles",
+          localField: "manufacturerVehicle",
+          foreignField: "_id",
+          as: "manufacturerVehicleInfo",
+        },
+      },
+      {
+        $unwind: "$manufacturerVehicleInfo",
+      },
+      {
+        $lookup: {
+          from: "models",
+          localField: "manufacturerVehicleInfo.model",
+          foreignField: "_id",
+          as: "modelInfo",
+        },
+      },
+      {
+        $unwind: "$modelInfo",
+      },
+      {
+        $lookup: {
+          from: "brands",
+          localField: "modelInfo.brand",
+          foreignField: "_id",
+          as: "brandInfo",
+        },
+      },
+      {
+        $unwind: "$brandInfo",
+      },
+      {
+        $match: {
+          "dealerInfo._id": new mongoose.Types.ObjectId(dealerId),
+        },
+      },
+      {
+        $facet: {
+          paginatedResults: [
+            {
+              $skip: (page - 1) * limit,
+            },
+            {
+              $limit: limit,
+            },
+          ],
+          totalCount: [
+            {
+              $count: "count",
+            },
+          ],
+        },
+      },
+    ]);
 
-    // Query the total count of models for the provided brandId
-    const totalModelsCount = await CarDb.DealerVehicle.countDocuments({
-      dealer: dealerId,
-    });
+    const dealerVehicles = result[0].paginatedResults;
 
-    const skip = (page - 1) * limit; // Calculate the offset
+    if (!dealerVehicles || dealerVehicles.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No dealer vehicles found for this model." });
+    }
 
-    // Query models based on the provided brandId with pagination
-    const models = await CarDb.DealerVehicle.find({ dealer: dealerId })
-      .populate({
-        path: "vehicleModel",
-        populate: { path: "brand" },
-      })
-      .populate("dealer")
-      .limit(limit)
-      .skip(skip);
-
-    const totalPages = Math.ceil(totalModelsCount / limit); // Calculate total pages
-    console.log(`totalPages: ${totalPages}`);
+    const totalModelsCount =
+      result[0].totalCount.length > 0 ? result[0].totalCount[0].count : 0;
+    const totalPages = Math.ceil(totalModelsCount / limit);
 
     res.json({
-      models,
+      dealerVehicles,
       currentPage: page,
-      totalPages: totalPages, // Include total pages in the response
+      totalPages: totalPages,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -342,84 +590,74 @@ const getDealerVehiclesByDealerId = async (req, res) => {
 const getSalesByDealers = async (req, res) => {
   try {
     const dealerId = req.params.dealerId;
-    const currentDate = new Date();
-    const threeYearsAgo = new Date(
-      currentDate.getFullYear() - 2,
-      currentDate.getMonth(),
-      currentDate.getDate()
-    );
+
     const sales = await CarDb.Sale.aggregate([
-      // {
-      //   $match: {
-      //     vehiclePrice: { $gt: 550000 },
-      //     createdAt: { $lte: threeYearsAgo },
-      //   },
-      // },
       {
         $lookup: {
           from: "dealervehicles", // Update this with your collection name
           localField: "dealerVehicle",
           foreignField: "_id",
-          as: "dealerVehicle",
+          as: "dealerVehicleInfo",
         },
       },
       {
-        $unwind: "$dealerVehicle", // In case it's an array after lookup
-      },
-      {
-        $match: {
-          "dealerVehicle.dealer": new mongoose.Types.ObjectId(dealerId),
-        },
+        $unwind: "$dealerVehicleInfo",
       },
       {
         $lookup: {
           from: "dealers", // Update this with your collection name
-          localField: "dealerVehicle.dealer",
+          localField: "dealerVehicleInfo.dealer",
           foreignField: "_id",
-          as: "dealer",
+          as: "dealerInfo",
         },
       },
       {
-        $unwind: "$dealer", // In case it's an array after lookup
+        $unwind: "$dealerInfo", // In case it's an array after lookup
       },
       {
         $lookup: {
-          from: "models", // Update this with your collection name
-          localField: "dealerVehicle.vehicleModel",
+          from: "manufacturervehicles", // Update this with your collection name
+          localField: "dealerVehicleInfo.manufacturerVehicle",
           foreignField: "_id",
-          as: "vehicleModel",
+          as: "manufacturerVehicleInfo",
         },
       },
       {
-        $unwind: "$vehicleModel", // In case it's an array after lookup
+        $unwind: "$manufacturerVehicleInfo", // In case it's an array after lookup
+      },
+      {
+        $lookup: {
+          from: "models", // Update this with your customer collection name
+          localField: "manufacturerVehicleInfo.model",
+          foreignField: "_id",
+          as: "modelInfo",
+        },
+      },
+      {
+        $unwind: "$modelInfo", // In case it's an array after lookup
       },
       {
         $lookup: {
           from: "brands", // Update this with your customer collection name
-          localField: "vehicleModel.brand",
+          localField: "modelInfo.brand",
           foreignField: "_id",
-          as: "brand",
+          as: "brandInfo",
         },
       },
       {
-        $unwind: "$brand", // In case it's an array after lookup
+        $unwind: "$brandInfo", // In case it's an array after lookup
       },
       {
         $lookup: {
           from: "customers", // Update this with your customer collection name
           localField: "customer",
           foreignField: "_id",
-          as: "customer",
+          as: "customerInfo",
         },
       },
       {
-        $unwind: "$customer", // In case it's an array after lookup
+        $unwind: "$customerInfo", // In case it's an array after lookup
       },
-      // {
-      //   $match: {
-      //     "customer._id": new mongoose.Types.ObjectId("656dbe6de3c7355512567d35"),
-      //   },
-      // },
       {
         $addFields: {
           formattedCreatedAt: {
@@ -452,6 +690,11 @@ const getSalesByDealers = async (req, res) => {
           formattedUpdatedAt: 0,
         },
       },
+      {
+        $match: {
+          "dealerInfo._id": new mongoose.Types.ObjectId(dealerId),
+        },
+      },
     ]);
 
     console.log(sales); // This might log an empty array if no results are found
@@ -470,55 +713,66 @@ const getSales = async (req, res) => {
           from: "dealervehicles", // Update this with your collection name
           localField: "dealerVehicle",
           foreignField: "_id",
-          as: "dealerVehicle",
+          as: "dealerVehicleInfo",
         },
       },
       {
-        $unwind: "$dealerVehicle", // In case it's an array after lookup
+        $unwind: "$dealerVehicleInfo", // In case it's an array after lookup
       },
       {
         $lookup: {
           from: "dealers", // Update this with your collection name
-          localField: "dealerVehicle.dealer",
+          localField: "dealerVehicleInfo.dealer",
           foreignField: "_id",
-          as: "dealer",
+          as: "dealerInfo",
         },
       },
       {
-        $unwind: "$dealer", // In case it's an array after lookup
+        $unwind: "$dealerInfo", // In case it's an array after lookup
+      },
+      {
+        $lookup: {
+          from: "manufacturervehicles", // Update this with your collection name
+          localField: "dealerVehicleInfo.manufacturerVehicle",
+          foreignField: "_id",
+          as: "manufacturerVehicleInfo",
+        },
+      },
+      {
+        $unwind: "$manufacturerVehicleInfo", // In case it's an array after lookup
       },
       {
         $lookup: {
           from: "models", // Update this with your collection name
-          localField: "dealerVehicle.vehicleModel",
+          localField: "manufacturerVehicleInfo.model",
           foreignField: "_id",
-          as: "vehicleModel",
+          as: "modelInfo",
         },
       },
       {
-        $unwind: "$vehicleModel", // In case it's an array after lookup
+        $unwind: "$modelInfo", // In case it's an array after lookup
       },
       {
         $lookup: {
           from: "brands", // Update this with your customer collection name
-          localField: "vehicleModel.brand",
+          localField: "modelInfo.brand",
           foreignField: "_id",
-          as: "brand",
+          as: "brandInfo",
         },
       },
       {
-        $unwind: "$brand", // In case it's an array after lookup
+        $unwind: "$brandInfo", // In case it's an array after lookup
       },
       {
         $lookup: {
           from: "customers", // Update this with your customer collection name
           localField: "customer",
           foreignField: "_id",
-          as: "customer",
+          as: "customerInfo",
         },
       },
       {
-        $unwind: "$customer", // In case it's an array after lookup
+        $unwind: "$customerInfo", // In case it's an array after lookup
       },
       {
         $addFields: {
@@ -554,6 +808,135 @@ const getSales = async (req, res) => {
       },
     ]);
     console.log(sales);
+    res.status(200).json(sales);
+  } catch (error) {
+    res.status(500).json(error);
+  }
+};
+
+const getVin = async (req, res) => {
+  try {
+    const searchQuery = req.query.query; // Assuming the VIN is passed as a query parameter
+
+    const sales = await CarDb.Sale.aggregate([
+      {
+        $lookup: {
+          from: "dealervehicles",
+          localField: "dealerVehicle",
+          foreignField: "_id",
+          as: "dealerVehicleInfo",
+        },
+      },
+      {
+        $unwind: "$dealerVehicleInfo",
+      },
+      {
+        $lookup: {
+          from: "dealers",
+          localField: "dealerVehicleInfo.dealer",
+          foreignField: "_id",
+          as: "dealerInfo",
+        },
+      },
+      {
+        $unwind: "$dealerInfo",
+      },
+      {
+        $lookup: {
+          from: "manufacturervehicles",
+          localField: "dealerVehicleInfo.manufacturerVehicle",
+          foreignField: "_id",
+          as: "manufacturerVehicleInfo",
+        },
+      },
+      {
+        $unwind: "$manufacturerVehicleInfo",
+      },
+      {
+        $lookup: {
+          from: "manufacturers",
+          localField: "manufacturerVehicleInfo.manufacturer",
+          foreignField: "_id",
+          as: "manufacturerInfo",
+        },
+      },
+      {
+        $unwind: "$manufacturerInfo",
+      },
+      {
+        $lookup: {
+          from: "models",
+          localField: "manufacturerVehicleInfo.model",
+          foreignField: "_id",
+          as: "modelInfo",
+        },
+      },
+      {
+        $unwind: "$modelInfo",
+      },
+      {
+        $lookup: {
+          from: "brands",
+          localField: "modelInfo.brand",
+          foreignField: "_id",
+          as: "brandInfo",
+        },
+      },
+      {
+        $unwind: "$brandInfo",
+      },
+      {
+        $lookup: {
+          from: "customers",
+          localField: "customer",
+          foreignField: "_id",
+          as: "customerInfo",
+        },
+      },
+      {
+        $unwind: "$customerInfo",
+      },
+      {
+        $addFields: {
+          formattedCreatedAt: {
+            $dateToString: {
+              date: "$createdAt",
+              format: "%m/%d/%Y",
+            },
+          },
+          formattedUpdatedAt: {
+            $dateToString: {
+              date: "$updatedAt",
+              format: "%m/%d/%Y",
+            },
+          },
+        },
+      },
+      {
+        $unset: ["createdAt", "updatedAt"],
+      },
+      {
+        $addFields: {
+          createdAt: "$formattedCreatedAt",
+          updatedAt: "$formattedUpdatedAt",
+        },
+      },
+      {
+        $project: {
+          formattedCreatedAt: 0,
+          formattedUpdatedAt: 0,
+        },
+      },
+      // Adding a match stage to filter based on VIN
+      {
+        $match: {
+          "manufacturerVehicleInfo.vin": {
+            $regex: new RegExp(searchQuery, "i"),
+          },
+        },
+      },
+    ]);
+
     res.status(200).json(sales);
   } catch (error) {
     res.status(500).json(error);
@@ -676,91 +1059,211 @@ const getTopBrandsBySalesTotalAmount = async (req, res) => {
       },
       {
         $lookup: {
-          from: "dealervehicles", // Update this with your collection name
+          from: "dealervehicles",
           localField: "dealerVehicle",
           foreignField: "_id",
-          as: "dealerVehicle",
+          as: "dealerVehicleInfo",
         },
       },
       {
-        $unwind: "$dealerVehicle", // In case it's an array after lookup
-      },
-      {
-        // lookup is like outer left join
-        $lookup: {
-          from: "dealers", // Update this with your collection name
-          localField: "dealerVehicle.dealer", // feild being reference
-          foreignField: "_id", // how are they being reference, in this case using object id
-          as: "dealer", // alias
-        },
-      },
-      {
-        $unwind: "$dealer", // In case it's an array after lookup
+        $unwind: "$dealerVehicleInfo",
       },
       {
         $lookup: {
-          from: "models", // Update this with your customer collection name
-          localField: "dealerVehicle.vehicleModel",
+          from: "dealers",
+          localField: "dealerVehicleInfo.dealer",
           foreignField: "_id",
-          as: "model",
+          as: "dealerInfo",
         },
       },
       {
-        $unwind: "$model", // In case it's an array after lookup
+        $unwind: "$dealerInfo",
       },
       {
         $lookup: {
-          from: "brands", // Update this with your customer collection name or table in your database
-          localField: "model.brand",
+          from: "manufacturervehicles",
+          localField: "dealerVehicleInfo.manufacturerVehicle",
           foreignField: "_id",
-          as: "brand",
+          as: "manufacturerVehicleInfo",
         },
       },
       {
-        $unwind: "$brand", // In case it's an array after lookup
+        $unwind: "$manufacturerVehicleInfo",
       },
       {
         $lookup: {
-          from: "manufacturers", // Update this with your collection name
-          localField: "brand.manufacturer",
+          from: "manufacturers",
+          localField: "manufacturerVehicleInfo.manufacturer",
           foreignField: "_id",
-          as: "manufacturer",
+          as: "manufacturerInfo",
         },
       },
       {
-        $unwind: "$manufacturer", // In case it's an array after lookup
+        $unwind: "$manufacturerInfo",
       },
-      // {
-      //   $lookup: {
-      //     from: "brands", // Update this with your customer collection name
-      //     localField: "vehicleModel.brand",
-      //     foreignField: "_id",
-      //     as: "brand",
-      //   },
-      // },
-      // {
-      //   $unwind: "$brand", // In case it's an array after lookup
-      // },
+      {
+        $lookup: {
+          from: "models",
+          localField: "manufacturerVehicleInfo.model",
+          foreignField: "_id",
+          as: "modelInfo",
+        },
+      },
+      {
+        $unwind: "$modelInfo",
+      },
+      {
+        $lookup: {
+          from: "brands",
+          localField: "modelInfo.brand",
+          foreignField: "_id",
+          as: "brandInfo",
+        },
+      },
+      {
+        $unwind: "$brandInfo",
+      },
       {
         $group: {
-          _id: "$brand.brandName",
-          totalSalesAmount: { $sum: "$vehiclePrice" }, // Assuming 'vehiclePrice' is the field representing the price of the vehicle
-          modelsSold: { $addToSet: "$model.modelName" },
-          manufacturer: {
-            $addToSet: "$manufacturer.manufacturerName",
-          },
+          _id: "$brandInfo.brandName", // Group by brand name
+          totalSalesAmount: { $sum: "$dealerVehicleInfo.price" }, // Calculate total sales amount for each brand
         },
       },
       {
         $sort: { totalSalesAmount: -1 }, // Sort by total sales amount in descending order
       },
       {
-        $limit: 3, // Limit to top 3 brands
+        $limit: 2, // Limit to top 3 brands
       },
     ]);
+
     res.status(200).json(topBrands);
   } catch (error) {
     console.error("Error fetching top brands:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getSalesThreeYearsPast = async (req, res) => {
+  try {
+    const pastYearStartDate = new Date();
+    pastYearStartDate.setFullYear(pastYearStartDate.getFullYear() - 3);
+
+    const topBrands = await CarDb.Sale.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: pastYearStartDate }, // Match sales from three years ago
+        },
+      },
+      {
+        $lookup: {
+          from: "dealervehicles",
+          localField: "dealerVehicle",
+          foreignField: "_id",
+          as: "dealerVehicleInfo",
+        },
+      },
+      {
+        $unwind: "$dealerVehicleInfo",
+      },
+      {
+        $lookup: {
+          from: "dealers",
+          localField: "dealerVehicleInfo.dealer",
+          foreignField: "_id",
+          as: "dealerInfo",
+        },
+      },
+      {
+        $unwind: "$dealerInfo",
+      },
+      {
+        $lookup: {
+          from: "manufacturervehicles",
+          localField: "dealerVehicleInfo.manufacturerVehicle",
+          foreignField: "_id",
+          as: "manufacturerVehicleInfo",
+        },
+      },
+      {
+        $unwind: "$manufacturerVehicleInfo",
+      },
+      {
+        $lookup: {
+          from: "manufacturers",
+          localField: "manufacturerVehicleInfo.manufacturer",
+          foreignField: "_id",
+          as: "manufacturerInfo",
+        },
+      },
+      {
+        $unwind: "$manufacturerInfo",
+      },
+      {
+        $lookup: {
+          from: "models",
+          localField: "manufacturerVehicleInfo.model",
+          foreignField: "_id",
+          as: "modelInfo",
+        },
+      },
+      {
+        $unwind: "$modelInfo",
+      },
+      {
+        $lookup: {
+          from: "brands",
+          localField: "modelInfo.brand",
+          foreignField: "_id",
+          as: "brandInfo",
+        },
+      },
+      {
+        $unwind: "$brandInfo",
+      },
+      {
+        $lookup: {
+          from: "customers",
+          localField: "customer",
+          foreignField: "_id",
+          as: "customerInfo",
+        },
+      },
+      {
+        $unwind: "$customerInfo",
+      },
+      {
+        $addFields: {
+          formattedCreatedAt: {
+            $dateToString: { date: "$createdAt", format: "%m/%d/%Y" },
+          },
+          formattedUpdatedAt: {
+            $dateToString: { date: "$updatedAt", format: "%m/%d/%Y" },
+          },
+        },
+      },
+      {
+        $unset: ["createdAt", "updatedAt"],
+      },
+      {
+        $addFields: {
+          createdAt: "$formattedCreatedAt",
+          updatedAt: "$formattedUpdatedAt",
+        },
+      },
+      {
+        $project: {
+          formattedCreatedAt: 0,
+          formattedUpdatedAt: 0,
+        },
+      },
+      {
+        $sort: { "dealerVehicleInfo.price": -1 },
+      }, // Sort by total sales amount in descending order
+    ]);
+    res.status(200).json(topBrands);
+  } catch (error) {
+    console.error("Error fetching sales from three years ago:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -784,6 +1287,11 @@ const updateManufacturer = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+//search for manufacturer vehicle by vin
+// const getManufacturerVehicleByVin = async(req,res) {
+
+// }
 
 module.exports = {
   //create
@@ -811,6 +1319,8 @@ module.exports = {
   getDealerVehiclesByModel,
   getDealerVehiclesByDealerId,
   getSalesByDealers,
+  getVin,
+  getSalesThreeYearsPast,
   // update
   updateManufacturer,
 };

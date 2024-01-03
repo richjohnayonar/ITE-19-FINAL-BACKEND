@@ -29,12 +29,11 @@ router.get(
 );
 router.get("/dealerVehicle", CarController.getDealerVehicle);
 router.get("/sales", CarController.getSales);
+router.get("/sales-by-vin", CarController.getVin);
 router.get("/salesByDealer/:dealerId", CarController.getSalesByDealers);
 router.get("/topBrandsBySales", CarController.getTopBrandsBySales);
-router.get(
-  "/topBrandsBySalesTotalAmount",
-  CarController.getTopBrandsBySalesTotalAmount
-);
+router.get("/sales-past-three-years", CarController.getSalesThreeYearsPast);
+router.get("/top-brand-sales", CarController.getTopBrandsBySalesTotalAmount);
 
 // update routes
 router.put("/update-manufacturer/:id", CarController.updateManufacturer);

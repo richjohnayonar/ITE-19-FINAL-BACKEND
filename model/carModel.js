@@ -118,10 +118,6 @@ const manufacturerVehicleSchema = mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: Model,
     },
-    dealer: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: Dealer,
-    },
     vin: {
       type: String,
     },
@@ -141,10 +137,6 @@ const ManufacturerVehicle = mongoose.model(
 
 const dealerVehicleSchema = mongoose.Schema(
   {
-    vehicleModel: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: Model,
-    },
     vehicleStatus: {
       type: String,
     },
@@ -152,9 +144,9 @@ const dealerVehicleSchema = mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: Dealer,
     },
-    manufacturer: {
+    manufacturerVehicle: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: Manufacturer,
+      ref: ManufacturerVehicle,
     },
     price: {
       type: Number,
@@ -198,9 +190,6 @@ const saleSchema = mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: DealerVehicle,
     },
-    vehiclePrice: {
-      type: Number,
-    },
     customer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: Customer,
@@ -213,6 +202,30 @@ const saleSchema = mongoose.Schema(
 
 const Sale = mongoose.model("Sale", saleSchema);
 
+const MoreImageSchema = mongoose.Schema({
+  vehicleModel: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: Model,
+  },
+  image: {
+    type: String,
+  },
+});
+
+const MoreImage = mongoose.model("MoreImage", MoreImageSchema);
+
+const MoreInfoSchema = mongoose.Schema({
+  vehicleModel: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: Model,
+  },
+  description: {
+    type: String,
+  },
+});
+
+const MoreInfo = mongoose.model("MoreInfo", MoreInfoSchema);
+
 module.exports = {
   Manufacturer,
   Brand,
@@ -223,4 +236,6 @@ module.exports = {
   DealerVehicle,
   Customer,
   Sale,
+  MoreImage,
+  MoreInfo,
 };
