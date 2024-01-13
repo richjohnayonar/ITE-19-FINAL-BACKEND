@@ -7,7 +7,6 @@ const router = express.Router();
 // post or create route
 router.post("/manufacturer", CarController.createManufacturer);
 router.post("/brand", CarController.createBrand);
-router.post("/option", CarController.createOption);
 router.post("/model", CarController.createModel);
 router.post("/manufacturerVehicle", CarController.createManufacturerVehicle);
 router.post("/dealer", CarController.createDealer);

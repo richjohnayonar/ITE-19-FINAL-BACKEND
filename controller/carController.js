@@ -5,7 +5,6 @@ const mongoose = require("mongoose");
 const createManufacturer = async (req, res) => {
   try {
     const manufacturer = await CarDb.Manufacturer.create(req.body);
-    console.log(manufacturer);
     res.status(200).json(manufacturer);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -16,19 +15,7 @@ const createManufacturer = async (req, res) => {
 const createBrand = async (req, res) => {
   try {
     const brand = await CarDb.Brand.create(req.body);
-    console.log(brand);
     res.status(200).json(brand);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// create option
-const createOption = async (req, res) => {
-  try {
-    const option = await CarDb.Option.create(req.body);
-    console.log(option);
-    res.status(200).json(option);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -38,7 +25,6 @@ const createOption = async (req, res) => {
 const createModel = async (req, res) => {
   try {
     const model = await CarDb.Model.create(req.body);
-    console.log(model);
     res.status(200).json(model);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -51,7 +37,6 @@ const createManufacturerVehicle = async (req, res) => {
     const manufacturerVehicle = await CarDb.ManufacturerVehicle.create(
       req.body
     );
-    console.log(manufacturerVehicle);
     res.status(200).json(manufacturerVehicle);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -62,7 +47,6 @@ const createManufacturerVehicle = async (req, res) => {
 const createDealer = async (req, res) => {
   try {
     const dealer = await CarDb.Dealer.create(req.body);
-    console.log(dealer);
     res.status(200).json(dealer);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -73,7 +57,6 @@ const createDealer = async (req, res) => {
 const createDealerVehicle = async (req, res) => {
   try {
     const dealerVehicle = await CarDb.DealerVehicle.create(req.body);
-    console.log(dealerVehicle);
     res.status(200).json(dealerVehicle);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -84,7 +67,6 @@ const createDealerVehicle = async (req, res) => {
 const createCustomer = async (req, res) => {
   try {
     const customer = await CarDb.Customer.create(req.body);
-    console.log(customer);
     res.status(200).json(customer);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -95,7 +77,6 @@ const createCustomer = async (req, res) => {
 const createSale = async (req, res) => {
   try {
     const sale = await CarDb.Sale.create(req.body);
-    console.log(sale);
     res.status(200).json(sale);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -106,7 +87,6 @@ const createSale = async (req, res) => {
 const getBrand = async (req, res) => {
   try {
     const brand = await CarDb.Brand.find().populate("manufacturer");
-    console.log(brand);
     res.status(200).json(brand);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -697,7 +677,6 @@ const getSalesByDealers = async (req, res) => {
       },
     ]);
 
-    console.log(sales); // This might log an empty array if no results are found
     res.status(200).json(sales);
   } catch (error) {
     console.error("Error fetching sales:", error);
@@ -807,7 +786,7 @@ const getSales = async (req, res) => {
         },
       },
     ]);
-    console.log(sales);
+
     res.status(200).json(sales);
   } catch (error) {
     res.status(500).json(error);
@@ -1297,7 +1276,6 @@ module.exports = {
   //create
   createManufacturer,
   createBrand,
-  createOption,
   createModel,
   createManufacturerVehicle,
   createDealer,
